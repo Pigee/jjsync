@@ -19,14 +19,14 @@ func main() {
 
 	// 链接jjwater和jwater
 
-	connjj, err := sql.Open("odbc", "dsn=jjwater;uid=sa;pwd=qyKe2852274")
+	connjj, err := sql.Open("odbc", "dsn=jjwater;uid=sa;pwd=password")
 
 	if err != nil {
 		fmt.Println("%s:连接jjwater错误.%s\n", time.Now().Format("2006-01-02 15:04:05.000"), err)
 		return
 	}
 
-	connj, err := sql.Open("odbc", "dsn=jwater;uid=sa;pwd=2852274")
+	connj, err := sql.Open("odbc", "dsn=jwater;uid=sa;pwd=password")
 
 	if err != nil {
 		fmt.Println("%s:连接jjwater错误.%s\n", time.Now().Format("2006-01-02 15:04:05.000"), err)

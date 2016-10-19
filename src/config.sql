@@ -1,13 +1,15 @@
-select top 1 * into sfjl_sync from sfjl;
-truncate table sfjl_sync;
+select top 1 *  into sfjl_sync from sfjl;
+--truncate table sfjl_sync;
 
 
-alter table sfjl_sync add sync_id varchar(36) primary key not null;
 
-alter table sfjl_sync add sync_date datetime not null;
+alter table sfjl_sync add sync_id varchar(36);
+
+alter table sfjl_sync add sync_date datetime ;
 
 ALTER TABLE sfjl_sync add sync_type varchar(20);
 
+update sfjl_sync set sync_id = newid(),sync_date = '2016-10-13 12:00:00',sync_type='insert';
 
 create trigger sfjl_insert
 on sfjl 
