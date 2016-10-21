@@ -4,7 +4,11 @@ import (
 	"database/sql"
 	"fmt"
 	_ "github.com/alexbrainman/odbc"
+	//"io"
+	"log"
 	"os"
+	"strconv"
+	//"strings"
 	"time"
 	// _ "github.com/go-sql-driver/mysql"
 	// "jputil"
@@ -17,26 +21,26 @@ import (
 //main函数程序入口
 func main() {
 
-	// 链接jjwater和jwater
+	// 链接jjtwater和jwater
 
-	connjj, err := sql.Open("odbc", "dsn=jjwater;uid=sa;pwd=password")
+	connjj, err := sql.Open("odbc", "dsn=jjdwater;uid=sa;pwd=qyKe2852274")
 
 	if err != nil {
-		fmt.Println("%s:连接jjwater错误.%s\n", time.Now().Format("2006-01-02 15:04:05.000"), err)
+		fmt.Println("%s:连接jjtwater错误.%s\n", time.Now().Format("2006-01-02 15:04:05.000"), err)
 		return
 	}
 
-	connj, err := sql.Open("odbc", "dsn=jwater;uid=sa;pwd=password")
+	connj, err := sql.Open("odbc", "dsn=jdwater;uid=sa;pwd=2852274")
 
 	if err != nil {
-		fmt.Println("%s:连接jjwater错误.%s\n", time.Now().Format("2006-01-02 15:04:05.000"), err)
+		fmt.Println("%s:连接jjtwater错误.%s\n", time.Now().Format("2006-01-02 15:04:05.000"), err)
 		return
 	}
+
 	var wxTime string    //微信本次同步开始时间
 	var wxmaxTime string //微信本次同步截止时间
 	//var bkTime string    银行本次同步开始时间
 	//var bkmaxTime string //银行本次同步截止时间
-	//fmt.Printf("%d\n", os.Getpid())
 	cond := true
 	for cond {
 
@@ -60,7 +64,7 @@ func main() {
 			}
 		*/
 		fmt.Printf("%s:-----------------------------------------------\n", time.Now().Format("2006-01-02 15:04:05.000"))
-		time.Sleep(10 * time.Second)
+		time.Sleep(30 * time.Second)
 		//cond = false
 	}
 
@@ -132,21 +136,25 @@ func SyncbkRecords(bkTime string, bkmaxTime string, connj *sql.DB, connjj *sql.D
 //同步微信收费数据
 func SyncwxRecords(wxTime string, wxmaxTime string, connj *sql.DB, connjj *sql.DB) int {
 
+	//打开LOG文件
+
 	stmt, err := connj.Prepare("select * from fh_weixindeal where deal_date > ? and deal_date <= ?")
-	// union all select ""maxtime"",max(sync_date) from sfjl_sync where sync_date > ?")
+	//union all select ""maxtime"",max(sync_date) from sfjl_sync where sync_date > ?")
 
 	if err != nil {
-		fmt.Println("%s:Prepare weixin SQL错误.%s\n", time.Now().Format("2006-01-02 15:04:05.000"), err)
+		log.Println("Prepare weixin SQL错误.%s\n", err)
 		return 0
 	}
-	defer stmt.Close()
 
 	row, err := stmt.Query(wxTime, wxmaxTime) // , mx, mx)
 	if err != nil {
-		fmt.Println("Query weixin SQL错误:", err)
+		log.Println("Query weixin SQL错误:%s", err)
 		return 0
 	}
 
+	//初始化log资源
+	logjj, _ := os.OpenFile("Jdinsertdata.log", os.O_CREATE|os.O_APPEND, 0)
+	var logstr string
 	var DEAL_ID string
 	var DEAL_NO string
 	var CUST_KH string
@@ -157,14 +165,6 @@ func SyncwxRecords(wxTime string, wxmaxTime string, connj *sql.DB, connjj *sql.D
 	var WX_NO string
 	var SS_MONEY float64
 
-	var DT_DETAIL_ID string
-	var DT_DEAL_NO string
-	var DT_CUST_KH string
-	var DT_DEAL_YEAR int
-	var DT_DEAL_MONTH int
-	var DT_DEAL_MONEY float64
-	var DT_N_ZNJ float64
-
 	//var DT_WATERP_QAN int
 	//var DT_USERB_SFFS string
 	r_count := 0
@@ -172,37 +172,47 @@ func SyncwxRecords(wxTime string, wxmaxTime string, connj *sql.DB, connjj *sql.D
 
 		if err := row.Scan(&DEAL_ID, &DEAL_NO, &CUST_KH, &DEAL_MONEY, &DEAL_DATE, &CREATE_DATE, &STATUS, &WX_NO, &SS_MONEY); err == nil {
 
-			//fmt.Println(DEAL_NO)
-
+			//初始化FH_WEIXINDEAL资源
 			stmt, err := connjj.Prepare("insert into fh_weixindeal values (?,?,?,?,?,?,?,?,?)")
-			// union all select ""maxtime"",max(sync_date) from sfjl_sync where sync_date > ?")
 
 			if err != nil {
 				fmt.Println("%s:Prepare SQL错误.%s\n", time.Now().Format("2006-01-02 15:04:05.000"), err)
-				return 0
+				continue
 			}
 			defer stmt.Close()
 
-			stmt.Query(DEAL_ID, DEAL_NO, CUST_KH, DEAL_MONEY, nil, CREATE_DATE, "0", nil, nil)
+			_, err = stmt.Query(DEAL_ID, DEAL_NO, CUST_KH, DEAL_MONEY, nil, CREATE_DATE, "0", nil, nil)
+
+			logstr = time.Now().Format("2006-01-02 15:04:05.000") + ":插入DEAL卡:" + CUST_KH + "流水:" + DEAL_NO + "\r\n"
+			fmt.Print(logstr)
+			logjj.WriteString(logstr)
+
 			//获得FH_WXDEALDETAIL数据
+			var DT_DETAIL_ID string
+			var DT_DEAL_NO string
+			var DT_CUST_KH string
+			var DT_DEAL_YEAR int
+			var DT_DEAL_MONTH int
+			var DT_DEAL_MONEY float64
+			var DT_N_ZNJ float64
 
 			stmt_dt, err := connj.Prepare("select [DETAIL_ID], [DEAL_NO], [CUST_KH], [DEAL_YEAR], [DEAL_MONTH], [DEAL_MONEY], [N_ZNJ] from  fh_wxdealdetail where deal_no = ?")
 
 			if err != nil {
-				fmt.Println("%s:Prepare SQL错误.%s\n", time.Now().Format("2006-01-02 15:04:05.000"), err)
+				log.Println("Prepare WXDEALDETAIL SQL错误.%s\n", err)
 				return 0
 			}
 
 			row_dt, err := stmt_dt.Query(DEAL_NO) // , mx, mx)
 			if err != nil {
-				fmt.Println("Query SQL错误:", err)
+				fmt.Println("Query WXDEALDETAIL  SQL错误:%s", err)
 				return 0
 			}
 
 			for row_dt.Next() {
 
 				if err := row_dt.Scan(&DT_DETAIL_ID, &DT_DEAL_NO, &DT_CUST_KH, &DT_DEAL_YEAR, &DT_DEAL_MONTH, &DT_DEAL_MONEY, &DT_N_ZNJ); err == nil {
-					//同步FH_WXDEALDETAIL数据
+
 					stmt_indt, err := connjj.Prepare("insert into fh_wxdealdetail([DETAIL_ID], [DEAL_NO], [CUST_KH], [DEAL_YEAR], [DEAL_MONTH], [DEAL_MONEY], [N_ZNJ]) values (?,?,?,?,?,?,?)")
 
 					if err != nil {
@@ -212,12 +222,14 @@ func SyncwxRecords(wxTime string, wxmaxTime string, connj *sql.DB, connjj *sql.D
 
 					stmt_indt.Query(DT_DETAIL_ID, DT_DEAL_NO, DT_CUST_KH, DT_DEAL_YEAR, DT_DEAL_MONTH, DT_DEAL_MONEY, DT_N_ZNJ)
 
-					defer stmt_indt.Close()
+					logstr = time.Now().Format("2006-01-02 15:04:05.000") + ":插入DETAIL:" + strconv.Itoa(DT_DEAL_YEAR) + "年" + strconv.Itoa(DT_DEAL_MONTH) + "月\r\n"
+					fmt.Print(logstr)
+					logjj.WriteString(logstr)
+
+					stmt_indt.Close()
 
 				}
 			}
-
-			//调用计费存储过程
 
 			stmt_sp, err := connjj.Prepare("EXEC WX_DEBT_PAYC ?,?,?")
 
@@ -226,8 +238,6 @@ func SyncwxRecords(wxTime string, wxmaxTime string, connj *sql.DB, connjj *sql.D
 				return 0
 			}
 
-			//fmt.Println(connjj.Stats())
-			//time.Sleep(5 * time.Second)
 			_, err = stmt_sp.Exec(DEAL_NO, WX_NO, DEAL_MONEY)
 
 			if err != nil {
@@ -237,12 +247,18 @@ func SyncwxRecords(wxTime string, wxmaxTime string, connj *sql.DB, connjj *sql.D
 
 			fmt.Printf("%s:同步卡号%s流水号%s账单金额%f完成.\n", time.Now().Format("2006-01-02 15:04:05.000"), CUST_KH, DEAL_NO, DEAL_MONEY)
 
-			stmt_sp.Close() //显式的关闭此连接，保证在存储过程调用执行完成后，才进入下一轮循环
+			stmt_sp.Close() //显式的关闭此连接，保证在存储过程调用执行完成后，才进入下一轮循
+			stmt_dt.Close()
+
+			//time.Sleep(time.Second)
 
 		}
 		r_count++
+
 	}
+	//stmt.Close()
 	//	connj.Close()
+	logjj.Close()
 	return r_count
 }
 
@@ -387,10 +403,11 @@ func SetbkmaxTime(connj *sql.DB, connjj *sql.DB) string {
 
 }
 
+//func
 //创建文件函数
-func CreateFile() {
-	if Exist("maxtime.file") == false {
-		os.Create("maxtime.file")
+func Createjjlog() {
+	if Exist("insertjjData.log") == false {
+		os.Create("insertjjData.log")
 	}
 }
 
