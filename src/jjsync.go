@@ -448,7 +448,7 @@ func insert(db *sql.DB) {
 }
 
 func main() {
-	db, err := sql.Open("mysql", "fh_ssdd:fh_ssdd@tcp(120.33.89.2:3306)/fh_ssdd?charset=utf8")
+	db, err := sql.Open("mysql", "fh_ssdd:fh_ssdd@tcp(192.168.2.23:3306)/fh_ssdd?charset=utf8")
 	// db, err := sql.Open("mysql", "fh_xydd:fh_xydd@tcp(192.168.2.23:3306)/fh_xydd?charset=utf8")
 	if err != nil {
 		log.Fatalf("Open database error: %s\n", err)
